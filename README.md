@@ -135,6 +135,15 @@ RAG_EMBEDDING_PROVIDER = "deepseek"
 **只想用本地向量模型、不调用云端 Embedding**  
 可将 `RAG_EMBEDDING_PROVIDER` 设为 `hf`，并配置对应的 `RAG_EMBEDDING_MODEL`（需安装 `sentence-transformers` 等依赖，首次运行会下载模型，体积较大）。
 
+**报错：`Descriptors cannot be created directly`（protobuf）**  
+多半是 **`protobuf` 4.x 与部分依赖里旧版生成的 `_pb2.py` 不兼容**。本项目已在 `requirements.txt` 中限制 `protobuf>=3.20,<4`；请在当前环境重新安装依赖，例如：
+
+```bash
+pip install -r requirements.txt
+```
+
+若仍报错，可再尝试在运行前设置环境变量：`PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python`（会变慢，一般仅作临时兜底）。
+
 ---
 
 ## 当前限制
