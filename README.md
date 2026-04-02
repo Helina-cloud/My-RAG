@@ -74,6 +74,29 @@ streamlit run streamlit_app.py
 
 ---
 
+## 部署到 Streamlit Cloud（密钥怎么配）
+
+云端**没有**你电脑上的 `.env` 文件，也不能把真实 Key 写进代码或提交到 Git。请用 **Streamlit Secrets**：
+
+1. 打开 [share.streamlit.io](https://share.streamlit.io) 里你的应用 → **Settings（齿轮）** → **Secrets**。
+2. 在编辑器里粘贴 **TOML**，至少包含 `DEEPSEEK_API_KEY`，例如：
+
+```toml
+DEEPSEEK_API_KEY = "sk-你的密钥"
+DEEPSEEK_BASE_URL = "https://api.deepseek.com"
+DEEPSEEK_MODEL = "deepseek-chat"
+DEEPSEEK_EMBEDDING_MODEL = "deepseek-embedding"
+RAG_EMBEDDING_PROVIDER = "deepseek"
+```
+
+3. 点击 **Save**，等待应用重新部署（或点 **Reboot app**）。
+
+应用启动时会从 `st.secrets` **同步到环境变量**，供对话和向量入库使用（与本地读 `.env` 行为一致）。
+
+**注意**：Streamlit Cloud 的文件系统是**临时的**，容器重启后本机上的 `docs/`、`chroma_db/` 可能清空。若只在网页里上传文档，重启后需重新上传并入库；需要长期保留可考虑外挂存储（S3 等），属进阶配置。
+
+---
+
 ## 在网页里怎么用
 
 1. **先建知识库（二选一）**  
@@ -100,7 +123,8 @@ streamlit run streamlit_app.py
 ## 常见问题
 
 **打不开页面或提示缺少 Key**  
-检查 `.env` 或 `api.env` 里是否已正确填写 `DEEPSEEK_API_KEY`，保存后重新运行 `streamlit run`。
+- **本地**：检查 `.env` 或 `api.env` 里是否填写 `DEEPSEEK_API_KEY`。  
+- **Streamlit Cloud**：在应用 **Settings → Secrets** 里配置（见上文「部署到 Streamlit Cloud」），保存并等待重新部署。
 
 **回答与我的文档无关**  
 确认已完成「入库」或 `docs/` 里已有内容；必要时勾选「重建向量库」再入库一次。

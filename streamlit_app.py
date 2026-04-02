@@ -14,6 +14,23 @@ from langchain_core.documents import Document
 from rag_store import add_docs_to_chroma, from_env, load_or_create_chroma, rebuild_chroma_from_docs
 
 
+def _sync_streamlit_secrets_to_env() -> None:
+    """Streamlit Cloud 只在 st.secrets 里注入密钥；rag_store 等模块读的是 os.environ，这里做一次同步。"""
+    try:
+        sec = st.secrets
+        pairs = sec.items() if hasattr(sec, "items") else ((k, sec[k]) for k in sec)
+        for k, v in pairs:
+            if isinstance(v, dict):
+                continue
+            if v is None or (isinstance(v, str) and not v.strip()):
+                continue
+            key = str(k)
+            if not os.getenv(key):
+                os.environ[key] = str(v)
+    except Exception:
+        pass
+
+
 def _get_env(name: str, default: str | None = None) -> str | None:
     v = os.getenv(name)
     if v is not None and str(v).strip() != "":
@@ -168,6 +185,7 @@ def _handle_upload_and_index(cfg):
 def main():
     load_dotenv(".env")
     load_dotenv("api.env")
+    _sync_streamlit_secrets_to_env()
 
     st.markdown("### RAG + DeepSeek（Streamlit）")
     st.caption("支持上传本地文档（txt/md）并一键建立/更新向量库。")
