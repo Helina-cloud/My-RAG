@@ -1,0 +1,16 @@
+.env
+*.env
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.DS_Store
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Vector DB
+data_base/
+chroma_db/
+
