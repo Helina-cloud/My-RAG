@@ -1,0 +1,58 @@
+from __future__ import annotations
+
+import time
+from typing import List, Optional
+
+from langchain_core.embeddings import Embeddings
+
+
+class DeepSeekEmbeddings(Embeddings):
+    """DeepSeek embeddings via OpenAI-compatible API."""
+
+    def __init__(
+        self,
+        *,
+        api_key: str,
+        base_url: str = "https://api.deepseek.com",
+        model: str = "deepseek-embedding",
+        timeout: float = 60.0,
+        max_retries: int = 3,
+        batch_size: int = 64,
+    ) -> None:
+        self.api_key = api_key
+        self.base_url = base_url.rstrip("/")
+        self.model = model
+        self.timeout = timeout
+        self.max_retries = max_retries
+        self.batch_size = batch_size
+
+        # Lazy import: langchain-openai usually brings openai package.
+        from openai import OpenAI  # type: ignore
+
+        self._client = OpenAI(api_key=self.api_key, base_url=self.base_url, timeout=self.timeout)
+
+    def _embed(self, texts: List[str]) -> List[List[float]]:
+        last_err: Optional[Exception] = None
+        for attempt in range(self.max_retries):
+            try:
+                resp = self._client.embeddings.create(model=self.model, input=texts)
+                # Ensure stable ordering by index
+                data = sorted(resp.data, key=lambda x: x.index)
+                return [d.embedding for d in data]
+            except Exception as e:  # noqa: BLE001
+                last_err = e
+                if attempt < self.max_retries - 1:
+                    time.sleep(0.8 * (2**attempt))
+                    continue
+                raise
+        raise RuntimeError(str(last_err))
+
+    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        out: List[List[float]] = []
+        for i in range(0, len(texts), self.batch_size):
+            out.extend(self._embed(texts[i : i + self.batch_size]))
+        return out
+
+    def embed_query(self, text: str) -> List[float]:
+        return self._embed([text])[0]
+
