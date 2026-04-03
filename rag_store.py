@@ -133,7 +133,8 @@ def add_docs_to_chroma(config: RagConfig, docs: List[Document]) -> Tuple[Chroma,
 def from_env() -> RagConfig:
     docs_dir = Path(os.getenv("RAG_DOCS_DIR", "docs"))
     chroma_dir = Path(os.getenv("RAG_CHROMA_DIR", "chroma_db"))
-    embedding_provider = os.getenv("RAG_EMBEDDING_PROVIDER", "deepseek")
+    # 默认用本地向量：DeepSeek 对话 API 可用，但 embeddings 接口常返回「No matched path」导致检索失败。
+    embedding_provider = os.getenv("RAG_EMBEDDING_PROVIDER", "hf")
     embedding_model = os.getenv(
         "RAG_EMBEDDING_MODEL",
         "deepseek-embedding"

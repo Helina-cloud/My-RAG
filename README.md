@@ -15,7 +15,7 @@
 ## 使用前准备
 
 1. 已安装 **Python 3.10+**（推荐 3.11/3.12）。
-2. 拥有 **DeepSeek API Key**（用于对话与默认的向量 embedding）。
+2. 拥有 **DeepSeek API Key**（用于**对话生成**；**向量检索**默认使用本机/云端下载的 HuggingFace 模型，避免 DeepSeek 侧 embedding 接口不兼容）。
 
 ---
 
@@ -58,7 +58,9 @@ pip install -r requirements.txt
 |------|--------|------|
 | `DEEPSEEK_BASE_URL` | `https://api.deepseek.com` | API 地址 |
 | `DEEPSEEK_MODEL` | `deepseek-chat` | 对话模型 |
-| `DEEPSEEK_EMBEDDING_MODEL` | 与下方 `RAG_EMBEDDING_MODEL` 配合 | 向量模型名，以官方文档为准 |
+| `RAG_EMBEDDING_PROVIDER` | `hf`（默认） | `hf` 为本地/下载模型做向量；仅当你确认 DeepSeek 已开放兼容的 embeddings 时可设 `deepseek` |
+| `RAG_EMBEDDING_MODEL` | `BAAI/bge-small-zh-v1.5`（`hf` 时） | 中文检索常用小模型 |
+| `DEEPSEEK_EMBEDDING_MODEL` | 见官方文档 | 仅 `RAG_EMBEDDING_PROVIDER=deepseek` 时使用 |
 
 应用启动时会自动读取项目根目录下的 **`.env`** 和 **`api.env`**（二者择一或同时存在均可，注意不要把密钥提交到公开仓库）。
 
@@ -85,8 +87,9 @@ streamlit run streamlit_app.py
 DEEPSEEK_API_KEY = "sk-你的密钥"
 DEEPSEEK_BASE_URL = "https://api.deepseek.com"
 DEEPSEEK_MODEL = "deepseek-chat"
-DEEPSEEK_EMBEDDING_MODEL = "deepseek-embedding"
-RAG_EMBEDDING_PROVIDER = "deepseek"
+# 向量检索默认用本地下载模型（推荐）。不要用 DeepSeek embedding 除非官方确认兼容 OpenAI embeddings 路径。
+RAG_EMBEDDING_PROVIDER = "hf"
+RAG_EMBEDDING_MODEL = "BAAI/bge-small-zh-v1.5"
 ```
 
 3. 点击 **Save**，等待应用重新部署（或点 **Reboot app**）。
@@ -130,10 +133,10 @@ RAG_EMBEDDING_PROVIDER = "deepseek"
 确认已完成「入库」或 `docs/` 里已有内容；必要时勾选「重建向量库」再入库一次。
 
 **Embedding 报错**  
-默认使用 DeepSeek 的向量接口；若官方模型名称有变更，请在环境变量中调整 `DEEPSEEK_EMBEDDING_MODEL` / `RAG_EMBEDDING_MODEL`，并查阅 DeepSeek 最新文档。
+默认使用 **HuggingFace 本地向量**（`RAG_EMBEDDING_PROVIDER=hf`）。若你曾使用 DeepSeek 做 embedding 并出现 **`No matched path found`**，多为对方**未开放**与 OpenAI 兼容的 `embeddings` 路径；请保持 `hf`，并**勾选重建向量库**后重新入库。
 
-**只想用本地向量模型、不调用云端 Embedding**  
-可将 `RAG_EMBEDDING_PROVIDER` 设为 `hf`，并配置对应的 `RAG_EMBEDDING_MODEL`（需安装 `sentence-transformers` 等依赖，首次运行会下载模型，体积较大）。
+**切换向量模型后检索异常**  
+向量维度会变：更换 `RAG_EMBEDDING_MODEL` 或 provider 后，请删除旧 `chroma_db/` 或在界面勾选「重建向量库」再入库。
 
 **报错：`Descriptors cannot be created directly`（protobuf）**  
 多半是 **`protobuf` 4.x 与部分依赖里旧版生成的 `_pb2.py` 不兼容**。本项目已在 `requirements.txt` 中限制 `protobuf>=3.20,<4`；请在当前环境重新安装依赖，例如：
@@ -143,6 +146,12 @@ pip install -r requirements.txt
 ```
 
 若仍报错，可再尝试在运行前设置环境变量：`PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python`（会变慢，一般仅作临时兜底）。
+
+**Streamlit Cloud 的 Logs 里看不到报错？**  
+部署日志主要记录 **克隆仓库、安装依赖、启动进程**。你在页面里点「发送」后的异常，**不一定**会出现在同一段日志里（尤其是前端 / WebSocket / 浏览器侧问题）。可配合：浏览器 **F12 → Network**，看是否有对 `/_stcore/` 等请求失败（红色）；或使用 **Chrome** 再试。若使用 **Edge** 且控制台出现 `Tracking Prevention blocked access to storage`，建议在站点设置里对 `*.streamlit.app` **关闭跟踪防护**，否则可能影响会话与连接。
+
+**若仍怀疑流式/WebSocket 问题**  
+可在 **Secrets** 中增加：`RAG_DISABLE_STREAMING = "1"`，部署后重试。
 
 ---
 
