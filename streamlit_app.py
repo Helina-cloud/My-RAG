@@ -107,27 +107,43 @@ def get_prompts():
     return condense_prompt, qa_prompt
 
 
+def _streaming_disabled() -> bool:
+    v = (_get_env("RAG_DISABLE_STREAMING") or "").strip().lower()
+    return v in ("1", "true", "yes", "on")
+
+
 def gen_response(prompt: str, ui_history: list[tuple[str, str]]):
-    retriever = get_retriever()
-    llm = get_llm()
-    condense_prompt, qa_prompt = get_prompts()
+    try:
+        retriever = get_retriever()
+        llm = get_llm()
+        condense_prompt, qa_prompt = get_prompts()
 
-    chat_history = _to_lc_history(ui_history)
+        chat_history = _to_lc_history(ui_history)
 
-    if len(chat_history) == 0:
-        query = prompt
-    else:
-        query = (condense_prompt | llm | StrOutputParser()).invoke(
-            {"input": prompt, "chat_history": chat_history}
+        if len(chat_history) == 0:
+            query = prompt
+        else:
+            query = (condense_prompt | llm | StrOutputParser()).invoke(
+                {"input": prompt, "chat_history": chat_history}
+            )
+
+        docs = retriever.invoke(query)
+        context = _docs_to_context(docs)
+
+        answer_chain = qa_prompt | llm | StrOutputParser()
+        if _streaming_disabled():
+            text = answer_chain.invoke(
+                {"input": prompt, "chat_history": chat_history, "context": context}
+            )
+            yield text
+            return
+        yield from answer_chain.stream(
+            {"input": prompt, "chat_history": chat_history, "context": context}
         )
-
-    docs = retriever.invoke(query)
-    context = _docs_to_context(docs)
-
-    answer_chain = qa_prompt | llm | StrOutputParser()
-    yield from answer_chain.stream(
-        {"input": prompt, "chat_history": chat_history, "context": context}
-    )
+    except Exception as e:
+        # Streamlit Cloud 上一旦 streaming 中途异常，前端可能只剩一个“路径不匹配”的提示。
+        # 这里把错误转成文本，避免断流。
+        yield f"抱歉，生成回答失败：{e}"
 
 
 def _handle_upload_and_index(cfg):
@@ -197,6 +213,12 @@ def _handle_upload_and_index(cfg):
 
 # Streamlit 应用程序界面
 def main():
+    # 必须是本脚本里第一个 Streamlit 命令，否则可能引发前端路由异常。
+    st.set_page_config(
+        page_title="My-RAG",
+        layout="wide",
+        initial_sidebar_state="expanded",
+    )
     load_dotenv(".env")
     load_dotenv("api.env")
     _sync_streamlit_secrets_to_env()
@@ -207,6 +229,9 @@ def main():
     cfg = from_env()
     cfg.docs_dir.mkdir(parents=True, exist_ok=True)
     _handle_upload_and_index(cfg)
+
+    if _streaming_disabled():
+        st.info("已开启 **非流式** 输出（`RAG_DISABLE_STREAMING`），用于排查 Cloud 上 WebSocket/流式兼容问题。")
 
     # 用于跟踪对话历史
     if "messages" not in st.session_state:
