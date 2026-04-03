@@ -133,6 +133,20 @@ def gen_response(prompt: str, ui_history: list[tuple[str, str]]):
 def _handle_upload_and_index(cfg):
     with st.sidebar:
         st.markdown("### 知识库管理")
+        # 仅展示“是否存在”以避免泄露密钥；Cloud 环境里关键是确认密钥能否被读取。
+        st.write(
+            f"DEEPSEEK_API_KEY 是否存在：{bool(os.getenv('DEEPSEEK_API_KEY'))}"
+        )
+        try:
+            doc_file_count = sum(
+                1
+                for p in cfg.docs_dir.rglob("*")
+                if p.is_file() and p.suffix.lower() in {".txt", ".md"}
+            )
+        except Exception:
+            doc_file_count = -1
+        st.write(f"`docs/` 文档文件数（.txt/.md）：{doc_file_count}")
+        st.write(f"`chroma_db/` 是否存在：{cfg.chroma_dir.exists()}")
         st.write(f"文档目录：`{cfg.docs_dir.as_posix()}`")
         st.write(f"向量库目录：`{cfg.chroma_dir.as_posix()}`")
         st.write(f"Embedding：`{cfg.embedding_provider}` / `{cfg.embedding_model}`")
