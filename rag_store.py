@@ -60,7 +60,7 @@ def _stable_chunk_ids(chunks: List[Document]) -> List[str]:
 
 
 def make_embeddings(provider: str, model_name: str):
-    provider = (provider or "fastembed").lower().strip()
+    provider = (provider or "hf").lower().strip()
     if provider in {"deepseek", "ds"}:
         api_key = os.getenv("DEEPSEEK_API_KEY", "").strip()
         base_url = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com").strip()
@@ -76,7 +76,7 @@ def make_embeddings(provider: str, model_name: str):
 
         return FastEmbedEmbeddings(model_name=model_name)
 
-    # hf: 需 pip install sentence-transformers torch（Cloud 上体积大，默认不用）
+    # hf: 需安装 sentence-transformers、torch（见 requirements.txt）
     from langchain_community.embeddings import HuggingFaceEmbeddings
 
     return HuggingFaceEmbeddings(
@@ -141,8 +141,8 @@ def add_docs_to_chroma(config: RagConfig, docs: List[Document]) -> Tuple[Chroma,
 def from_env() -> RagConfig:
     docs_dir = Path(os.getenv("RAG_DOCS_DIR", "docs"))
     chroma_dir = Path(os.getenv("RAG_CHROMA_DIR", "chroma_db"))
-    # 默认 fastembed：无 torch，适合 Streamlit Cloud；DeepSeek embedding 常有 No matched path
-    prov = (os.getenv("RAG_EMBEDDING_PROVIDER") or "fastembed").lower().strip()
+    # 默认 hf（sentence-transformers + torch）；可选 fastembed / deepseek
+    prov = (os.getenv("RAG_EMBEDDING_PROVIDER") or "hf").lower().strip()
     embedding_provider = prov
     if prov in {"deepseek", "ds"}:
         default_model = "deepseek-embedding"

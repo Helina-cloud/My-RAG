@@ -15,7 +15,7 @@
 ## 使用前准备
 
 1. 已安装 **Python 3.10+**（推荐 3.11/3.12）。
-2. 拥有 **DeepSeek API Key**（用于**对话生成**）；**向量检索**默认用 **FastEmbed**（轻量、适合 Streamlit Cloud，无需 torch）。
+2. 拥有 **DeepSeek API Key**（用于**对话生成**）；**向量检索**默认用 **HuggingFace**（`sentence-transformers` + `torch`，见 `requirements.txt`）。
 
 ---
 
@@ -58,8 +58,8 @@ pip install -r requirements.txt
 |------|--------|------|
 | `DEEPSEEK_BASE_URL` | `https://api.deepseek.com` | API 地址 |
 | `DEEPSEEK_MODEL` | `deepseek-chat` | 对话模型 |
-| `RAG_EMBEDDING_PROVIDER` | `fastembed`（默认） | `fastembed`：Cloud 推荐；`hf`：需额外装 `sentence-transformers`+`torch`；`deepseek` 易报 No matched path |
-| `RAG_EMBEDDING_MODEL` | `intfloat/multilingual-e5-small`（`fastembed` 时） | 多语含中文；换模型后需重建向量库 |
+| `RAG_EMBEDDING_PROVIDER` | `hf`（默认） | `hf`：`BAAI/bge-small-zh-v1.5`；`fastembed`：更轻、无需 torch；`deepseek` 易报 No matched path |
+| `RAG_EMBEDDING_MODEL` | `BAAI/bge-small-zh-v1.5`（默认） | 换模型后需重建向量库 |
 | `DEEPSEEK_EMBEDDING_MODEL` | 见官方文档 | 仅 `RAG_EMBEDDING_PROVIDER=deepseek` 时使用 |
 
 应用启动时会自动读取项目根目录下的 **`.env`** 和 **`api.env`**（二者择一或同时存在均可，注意不要把密钥提交到公开仓库）。
@@ -87,9 +87,9 @@ streamlit run streamlit_app.py
 DEEPSEEK_API_KEY = "sk-你的密钥"
 DEEPSEEK_BASE_URL = "https://api.deepseek.com"
 DEEPSEEK_MODEL = "deepseek-chat"
-# 向量检索默认 FastEmbed（推荐 Cloud）。若要用 HF 的 bge，改为 hf 并自行在 requirements 增加 sentence-transformers、torch。
-RAG_EMBEDDING_PROVIDER = "fastembed"
-RAG_EMBEDDING_MODEL = "intfloat/multilingual-e5-small"
+# 向量检索默认 HF（requirements 含 sentence-transformers、torch）。Cloud 资源紧可改用 fastembed。
+RAG_EMBEDDING_PROVIDER = "hf"
+RAG_EMBEDDING_MODEL = "BAAI/bge-small-zh-v1.5"
 ```
 
 3. 点击 **Save**，等待应用重新部署（或点 **Reboot app**）。
@@ -133,11 +133,14 @@ RAG_EMBEDDING_MODEL = "intfloat/multilingual-e5-small"
 确认已完成「入库」或 `docs/` 里已有内容；必要时勾选「重建向量库」再入库一次。
 
 **Embedding 报错**  
-- **`Could not import sentence_transformers`**：说明当前配置成了 `RAG_EMBEDDING_PROVIDER=hf`，但环境里没有安装 `sentence-transformers`/`torch`。请改为 **`fastembed`**（默认），或在 `requirements.txt` 里加回这两依赖。  
-- **`No matched path found`（DeepSeek embedding）**：请改用 **`fastembed`** 或本地 **`hf`**，并**勾选重建向量库**后重新入库。
+- **`Could not import sentence_transformers`**：确认 `requirements.txt` 已包含 `sentence-transformers` 与 `torch`，重新部署并安装依赖。或临时改用 **`RAG_EMBEDDING_PROVIDER=fastembed`**（需在 requirements 增加 `fastembed`）。  
+- **`No matched path found`（DeepSeek embedding）**：请改用 **`hf`** 或 **`fastembed`**，并**勾选重建向量库**后重新入库。
 
 **切换向量模型后检索异常**  
 向量维度会变：更换 `RAG_EMBEDDING_MODEL` 或 provider 后，请删除旧 `chroma_db/` 或在界面勾选「重建向量库」再入库。
+
+**`ModuleNotFoundError: No module named 'torchvision'`**  
+`sentence-transformers` / `transformers` 在部分子模块里会引用 `torchvision`。Streamlit 的源码监视器遍历包路径时可能触发惰性导入。请保证 `requirements.txt` 里已安装 **`torchvision`**（与 `torch` 配套），重新部署。
 
 **报错：`Descriptors cannot be created directly`（protobuf）**  
 多半是 **`protobuf` 4.x 与部分依赖里旧版生成的 `_pb2.py` 不兼容**。本项目已在 `requirements.txt` 中限制 `protobuf>=3.20,<4`；请在当前环境重新安装依赖，例如：
