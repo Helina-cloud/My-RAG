@@ -60,7 +60,7 @@ def _stable_chunk_ids(chunks: List[Document]) -> List[str]:
 
 
 def make_embeddings(provider: str, model_name: str):
-    provider = (provider or "hf").lower().strip()
+    provider = (provider or "fastembed").lower().strip()
     if provider in {"deepseek", "ds"}:
         api_key = os.getenv("DEEPSEEK_API_KEY", "").strip()
         base_url = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com").strip()
@@ -68,7 +68,15 @@ def make_embeddings(provider: str, model_name: str):
             raise RuntimeError("Missing DEEPSEEK_API_KEY for DeepSeek embeddings.")
         return DeepSeekEmbeddings(api_key=api_key, base_url=base_url, model=model_name)
 
-    # Default: local huggingface sentence-transformers
+    if provider in {"fastembed", "fe"}:
+        try:
+            from langchain_community.embeddings.fastembed import FastEmbedEmbeddings
+        except ImportError:
+            from langchain_community.embeddings import FastEmbedEmbeddings
+
+        return FastEmbedEmbeddings(model_name=model_name)
+
+    # hf: 需 pip install sentence-transformers torch（Cloud 上体积大，默认不用）
     from langchain_community.embeddings import HuggingFaceEmbeddings
 
     return HuggingFaceEmbeddings(
@@ -133,14 +141,16 @@ def add_docs_to_chroma(config: RagConfig, docs: List[Document]) -> Tuple[Chroma,
 def from_env() -> RagConfig:
     docs_dir = Path(os.getenv("RAG_DOCS_DIR", "docs"))
     chroma_dir = Path(os.getenv("RAG_CHROMA_DIR", "chroma_db"))
-    # 默认用本地向量：DeepSeek 对话 API 可用，但 embeddings 接口常返回「No matched path」导致检索失败。
-    embedding_provider = os.getenv("RAG_EMBEDDING_PROVIDER", "hf")
-    embedding_model = os.getenv(
-        "RAG_EMBEDDING_MODEL",
-        "deepseek-embedding"
-        if embedding_provider.lower().strip() in {"deepseek", "ds"}
-        else "BAAI/bge-small-zh-v1.5",
-    )
+    # 默认 fastembed：无 torch，适合 Streamlit Cloud；DeepSeek embedding 常有 No matched path
+    prov = (os.getenv("RAG_EMBEDDING_PROVIDER") or "fastembed").lower().strip()
+    embedding_provider = prov
+    if prov in {"deepseek", "ds"}:
+        default_model = "deepseek-embedding"
+    elif prov in {"fastembed", "fe"}:
+        default_model = "intfloat/multilingual-e5-small"
+    else:
+        default_model = "BAAI/bge-small-zh-v1.5"
+    embedding_model = os.getenv("RAG_EMBEDDING_MODEL", default_model)
     # Same override as chat LLM config: keep retrieval and indexing on one model
     if embedding_provider.lower().strip() in {"deepseek", "ds"}:
         embedding_model = os.getenv("DEEPSEEK_EMBEDDING_MODEL", embedding_model)

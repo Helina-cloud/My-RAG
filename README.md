@@ -15,7 +15,7 @@
 ## 使用前准备
 
 1. 已安装 **Python 3.10+**（推荐 3.11/3.12）。
-2. 拥有 **DeepSeek API Key**（用于**对话生成**；**向量检索**默认使用本机/云端下载的 HuggingFace 模型，避免 DeepSeek 侧 embedding 接口不兼容）。
+2. 拥有 **DeepSeek API Key**（用于**对话生成**）；**向量检索**默认用 **FastEmbed**（轻量、适合 Streamlit Cloud，无需 torch）。
 
 ---
 
@@ -58,8 +58,8 @@ pip install -r requirements.txt
 |------|--------|------|
 | `DEEPSEEK_BASE_URL` | `https://api.deepseek.com` | API 地址 |
 | `DEEPSEEK_MODEL` | `deepseek-chat` | 对话模型 |
-| `RAG_EMBEDDING_PROVIDER` | `hf`（默认） | `hf` 为本地/下载模型做向量；仅当你确认 DeepSeek 已开放兼容的 embeddings 时可设 `deepseek` |
-| `RAG_EMBEDDING_MODEL` | `BAAI/bge-small-zh-v1.5`（`hf` 时） | 中文检索常用小模型 |
+| `RAG_EMBEDDING_PROVIDER` | `fastembed`（默认） | `fastembed`：Cloud 推荐；`hf`：需额外装 `sentence-transformers`+`torch`；`deepseek` 易报 No matched path |
+| `RAG_EMBEDDING_MODEL` | `intfloat/multilingual-e5-small`（`fastembed` 时） | 多语含中文；换模型后需重建向量库 |
 | `DEEPSEEK_EMBEDDING_MODEL` | 见官方文档 | 仅 `RAG_EMBEDDING_PROVIDER=deepseek` 时使用 |
 
 应用启动时会自动读取项目根目录下的 **`.env`** 和 **`api.env`**（二者择一或同时存在均可，注意不要把密钥提交到公开仓库）。
@@ -87,9 +87,9 @@ streamlit run streamlit_app.py
 DEEPSEEK_API_KEY = "sk-你的密钥"
 DEEPSEEK_BASE_URL = "https://api.deepseek.com"
 DEEPSEEK_MODEL = "deepseek-chat"
-# 向量检索默认用本地下载模型（推荐）。不要用 DeepSeek embedding 除非官方确认兼容 OpenAI embeddings 路径。
-RAG_EMBEDDING_PROVIDER = "hf"
-RAG_EMBEDDING_MODEL = "BAAI/bge-small-zh-v1.5"
+# 向量检索默认 FastEmbed（推荐 Cloud）。若要用 HF 的 bge，改为 hf 并自行在 requirements 增加 sentence-transformers、torch。
+RAG_EMBEDDING_PROVIDER = "fastembed"
+RAG_EMBEDDING_MODEL = "intfloat/multilingual-e5-small"
 ```
 
 3. 点击 **Save**，等待应用重新部署（或点 **Reboot app**）。
@@ -133,7 +133,8 @@ RAG_EMBEDDING_MODEL = "BAAI/bge-small-zh-v1.5"
 确认已完成「入库」或 `docs/` 里已有内容；必要时勾选「重建向量库」再入库一次。
 
 **Embedding 报错**  
-默认使用 **HuggingFace 本地向量**（`RAG_EMBEDDING_PROVIDER=hf`）。若你曾使用 DeepSeek 做 embedding 并出现 **`No matched path found`**，多为对方**未开放**与 OpenAI 兼容的 `embeddings` 路径；请保持 `hf`，并**勾选重建向量库**后重新入库。
+- **`Could not import sentence_transformers`**：说明当前配置成了 `RAG_EMBEDDING_PROVIDER=hf`，但环境里没有安装 `sentence-transformers`/`torch`。请改为 **`fastembed`**（默认），或在 `requirements.txt` 里加回这两依赖。  
+- **`No matched path found`（DeepSeek embedding）**：请改用 **`fastembed`** 或本地 **`hf`**，并**勾选重建向量库**后重新入库。
 
 **切换向量模型后检索异常**  
 向量维度会变：更换 `RAG_EMBEDDING_MODEL` 或 provider 后，请删除旧 `chroma_db/` 或在界面勾选「重建向量库」再入库。

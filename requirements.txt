@@ -13,6 +13,5 @@ protobuf>=3.20.0,<4.0.0
 
 chromadb>=0.5.5
 langchain-chroma>=0.1.0
-sentence-transformers>=3.0.1
-torch
-
+# 默认向量（Cloud 友好，无需 torch）；若 RAG_EMBEDDING_PROVIDER=hf 请再装 sentence-transformers torch
+fastembed>=0.4.0
